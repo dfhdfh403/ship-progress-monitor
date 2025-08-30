@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>船用电器出货进度监控大屏 - 预警系统</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            background: none;
+            color: #e0f7ff;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* 添加动态背景Canvas */
+        #c, #pinkboard {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        
+        /* 装饰元素 */
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(rgba(16, 42, 67, 0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(16, 42, 67, 0.3) 1px, transparent 1px);
+            background-size: 20px 20px;
+            z-index: 0;
+            pointer-events: none;
+        }
+        
+        .corner-decor {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border: 2px solid #2e9cca;
+        }
+        
+        .corner-decor.tl {
+            top: 30px;
+            left: 30px;
+            border-right: none;
+            border-bottom: none;
+        }
+        
+        .corner-decor.tr {
+            top: 30px;
+            right: 30px;
+            border-left: none;
+            border-bottom: none;
+        }
+        
+        .corner-decor.bl {
+            bottom: 30px;
+            left: 30px;
+            border-right: none;
+            border-top: none;
+        }
+        
+        .corner-decor.br {
+            bottom: 30px;
+            right: 30px;
+            border-left: none;
+            border-top: none;
+        }
+        
+        /* 头部样式 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: rgba(10, 25, 47, 0.8);
+            border-bottom: 1px solid rgba(46, 156, 202, 0.3);
+            position: relative;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo {
+            background: #1a3a5f;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid #2e9cca;
+        }
+        
+        .logo i {
+            font-size: 36px;
+            color: #4fc3f7;
+        }
+        
+        .title-container h1 {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 10px rgba(79, 195, 247, 0.3);
+            margin-bottom: 5px;
+        }
+        
+        .title-container .subtitle {
+            font-size: 16px;
+            color: #89cff0;
+            display: flex;
+            gap: 20px;
+        }
+        
+        .info-container {
+            text-align: right;
+        }
+        
+        .time-weather {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+        }
+        
+        .real-time {
+            font-size: 20px;
+            font-weight: 600;
+            color: #29b6f6;
+        }
+        
+        .weather {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(26, 58, 95, 0.6);
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 1px solid rgba(46, 156, 202, 0.4);
+        }
+        
+        .weather i {
+            font-size: 24px;
+            color: #ffcc00;
+        }
+        
+        .weather span {
+            font-size: 16px;
+            color: #e0f7ff;
+        }
+        
+        .project-info {
+            margin-top: 10px;
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #89cff0;
+        }
+        
+        .project-info span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .project-info i {
+            color: #4fc3f7;
+        }
+        
+        /* 主内容区 */
+        .main-container {
+            padding: 20px 30px;
+            position: relative;
+            z-index: 5;
+        }
+        
+        .table-container {
+            background: rgba(16, 42, 67, 0.6);
+            border-radius: 8px;
+            border: 1px solid rgba(46, 156, 202, 0.3);
+            box-shadow: 0 0 30px rgba(0, 100, 200, 0.2);
+            overflow: hidden;
+            margin-top: 15px;
+            height: 65vh;
+            position: relative;
+            backdrop-filter: blur(3px);
+        }
+        
+        /* 固定表头 */
+        .table-header {
+            display: grid;
+            grid-template-columns: 50px 200px 220px 100px 120px 150px 100px 100px 100px 100px 100px;
+            background: linear-gradient(90deg, #1a3a5f, #0c2d4d);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            font-weight: bold;
+            border-bottom: 2px solid #2e9cca;
+        }
+        
+        .header-cell {
+            padding: 15px 10px;
+            text-align: center;
+            color: #4fc3f7;
+            font-size: 15px;
+            text-shadow: 0 0 5px rgba(79, 195, 247, 0.3);
+        }
+        
+        /* 滚动表格主体 */
+        .table-body {
+            overflow: hidden;
+            height: calc(100% - 50px);
+        }
+        
+        .table-rows {
+            animation: scroll 600s linear infinite;
+        }
+        
+        .table-row {
+            display: grid;
+            grid-template-columns: 50px 200px 220px 100px 120px 150px 100px 100px 100px 100px 100px;
+            border-bottom: 1px solid rgba(46, 156, 202, 0.1);
+            transition: all 0.3s ease;
+            min-height: 65px;
+        }
+        
+        .table-row:hover {
+            background: rgba(26, 58, 95, 0.4);
+        }
+        
+        /* 蓝色呼吸效果 */
+        .table-row.highlight {
+            background: rgba(46, 156, 202, 0.2);
+            animation: highlight-pulse 2s infinite;
+        }
+        /* 蓝色呼吸动画 */
+        @keyframes highlight-pulse {
+            0% { box-shadow: 0 0 5px rgba(79, 195, 247, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(79, 195, 247, 0.8); }
+            100% { box-shadow: 0 0 5px rgba(79, 195, 247, 0.5); }
+        }
+        
+        .row-cell {
+            padding: 8px 10px;
+            text-align: center;
+            font-size: 14px;
+            color: #e0f7ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* 完整显示长文本的单元格 */
+        .row-cell.long-text {
+            text-align: left;
+            white-space: normal;
+            word-break: break-all;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 10px;
+        }
+        
+        /* 进度样式 */
+        .progress-cell {
+            position: relative;
+        }
+        
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00c853, #64dd17);
+            z-index: 1;
+        }
+        
+        /* 状态标签 */
+        .status-tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-ready { background: rgba(0, 200, 83, 0.2); color: #00e676; }
+        .status-waiting { background: rgba(255, 152, 0, 0.2); color: #ffb300; }
+        .status-shipped { background: rgba(3, 169, 244, 0.2); color: #29b6f6; }
+        .status-debug { background: rgba(156, 39, 176, 0.2); color: #d500f9; }
+        .status-production { background: rgba(244, 67, 54, 0.2); color: #ff5252; }
+        
+        /* 动画 */
+        @keyframes scroll {
+            0% {
+                transform: translateY(0);
+            }
+            100% {
+                transform: translateY(-100%);
+            }
+        }
+        
+        /* 底部信息 */
+        .footer {
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10, 25, 47, 0.8);
+            border-top: 1px solid rgba(46, 156, 202, 0.3);
+            position: relative;
+            z-index: 10;
+            margin-top: 20px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .days-counter {
+            background: rgba(26, 58, 95, 0.6);
+            padding: 8px 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(46, 156, 202, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .days-counter i {
+            color: #29b6f6;
+            font-size: 20px;
+        }
+        
+        .days-counter span {
+            font-size: 16px;
+            color: #e0f7ff;
+        }
+        
+        .days-counter .number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4fc3f7;
+            margin: 0 5px;
+        }
+        
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            color: #89cff0;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4caf50;
+            box-shadow: 0 0 8px #4caf50;
+        }
+        
+        .status-indicator.active {
+            background: #4caf50;
+        }
+        
+        .status-indicator.inactive {
+            background: #f44336;
+        }
+        
+        /* 错误信息样式 */
+        .error-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            color: #ff5252;
+            font-weight: bold;
+        }
+        
+        /* 响应式调整 */
+        @media (max-width: 1800px) {
+            .table-header, .table-row {
+                grid-template-columns: 50px 180px 200px 90px 110px 140px 90px 90px 90px 90px 90px;
+            }
+            
+            .header-cell, .row-cell {
+                padding: 12px 8px;
+                font-size: 14px;
+            }
+            
+            .title-container h1 {
+                font-size: 28px;
+            }
+        }
+        
+        @media (max-width: 1600px) {
+            .table-header, .table-row {
+                grid-template-columns: 50px 160px 180px 80px 100px 130px 80px 80px 80px 80px 80px;
+            }
+            
+            .header-cell, .row-cell {
+                padding: 10px 6px;
+                font-size: 13px;
+            }
+        }
+        
+        /* 预警弹窗样式 - 增强版 */
+        .alert-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+            border: 3px solid #ff6666;
+            border-radius: 15px;
+            padding: 30px 40px;
+            z-index: 1000;
+            box-shadow: 0 0 40px rgba(255, 0, 0, 0.8);
+            color: white;
+            text-align: center;
+            min-width: 500px;
+            max-width: 80%;
+            animation: alertPulse 1.5s infinite, shake 0.5s infinite;
+        }
+        
+        .alert-popup h2 {
+            margin: 15px 0;
+            font-size: 32px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+        }
+        
+        .alert-content {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .alert-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .alert-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .alert-project {
+            font-weight: bold;
+            font-size: 18px;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        
+        .alert-date {
+            font-size: 16px;
+            color: #ffcc00;
+            margin-bottom: 5px;
+        }
+        
+        .alert-message {
+            font-size: 16px;
+            color: #ffe6e6;
+        }
+        
+        .alert-icon {
+            font-size: 60px;
+            color: #fff;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes alertPulse {
+            0% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.7); }
+            50% { box-shadow: 0 0 50px rgba(255, 0, 0, 0.9); }
+            100% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.7); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+            10%, 30%, 50%, 70%, 90% { transform: translate(-50%, -50%) rotate(-3deg); }
+            20%, 40%, 60%, 80% { transform: translate(-50%, -50%) rotate(3deg); }
+        }
+        
+        /* 预警时间设置面板 */
+        .settings-panel {
+            position: fixed;
+            top: 120px;
+            right: 30px;
+            background: rgba(26, 58, 95, 0.95);
+            border: 1px solid #2e9cca;
+            border-radius: 10px;
+            padding: 20px;
+            z-index: 100;
+            width: 300px;
+            box-shadow: 0 0 20px rgba(0, 100, 200, 0.5);
+            backdrop-filter: blur(5px);
+        }
+        
+        .settings-panel h3 {
+            color: #4fc3f7;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .time-control {
+            margin-bottom: 15px;
+        }
+        
+        .time-control label {
+            display: block;
+            margin-bottom: 5px;
+            color: #89cff0;
+        }
+        
+        .time-control input {
+            width: 100%;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #2e9cca;
+            background: rgba(16, 42, 67, 0.8);
+            color: #e0f7ff;
+        }
+        
+        .settings-btn {
+            background: linear-gradient(135deg, #2e9cca, #1a6a94);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            width: 100%;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .settings-btn:hover {
+            background: linear-gradient(135deg, #3aaae0, #1e7fb5);
+        }
+        
+        /* 特殊标记样式 */
+        .delivery-mark {
+            display: inline-block;
+            margin-left: 5px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .delivery-mark.FAT {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+        
+        .delivery-mark.船检 {
+            background: rgba(33, 150, 243, 0.2);
+            color: #2196f3;
+        }
+        
+        /* 测试按钮样式 */
+        .test-alert-btn {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background: rgba(0, 150, 255, 0.8);
+            border: 2px solid #03a9f4;
+            border-radius: 8px;
+            padding: 8px 15px;
+            z-index: 100;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        /* 高大上的滚屏样式 - 已修改透明度 */
+        .alert-ticker {
+            position: fixed;
+            bottom: 80px; /* 调整位置，避免覆盖底部内容 */
+            left: 0;
+            width: 100%;
+            background: linear-gradient(90deg, rgba(255,0,0,0.7) 0%, rgba(204,0,0,0.7) 100%); /* 添加透明度 */
+            color: white;
+            padding: 12px 0;
+            z-index: 1000;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+        
+        .ticker-container {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            animation: ticker-scroll 60s linear infinite;
+        }
+        
+        .ticker-title {
+            font-weight: bold;
+            padding: 0 20px;
+            font-size: 18px;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+            border-right: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .ticker-content {
+            display: inline-block;
+            padding: 0 20px;
+        }
+        
+        .ticker-item {
+            display: inline-block;
+            margin-right: 50px;
+        }
+        
+        .ticker-project {
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        
+        .ticker-date {
+            margin-right: 15px;
+            color: #ffcc00;
+        }
+        
+        @keyframes ticker-scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        /* 新设置按钮样式 - Uiverse.io by mrtqzbek11 */
+        .settings-toggle-button {
+            width: 62px;
+            height: 62px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 24px;
+            border-radius: 50%;
+            border: none;
+            position: fixed;
+            top: 120px;
+            right: 30px;
+            background: #100720;
+            transition: 0.1s;
+            z-index: 99;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .settings-toggle-button::after {
+            content: '';
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient( circle farthest-corner at 10% 20%,  rgba(255,94,247,1) 17.8%, rgba(2,245,255,1) 100.2% );
+            filter: blur(15px);
+            z-index: -1;
+            position: absolute;
+            left: 0;
+            top: 0;
+            border-radius: 50%;
+        }
+        
+        .settings-toggle-button:active {
+            transform: scale(0.9) rotate(3deg);
+            background: radial-gradient( circle farthest-corner at 10% 20%,  rgba(255,94,247,1) 17.8%, rgba(2,245,255,1) 100.2% );
+            transition: 0.5s;
+        }
+        
+        /* 按钮悬停效果增强 */
+        .settings-toggle-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 94, 247, 0.6);
+        }
+        
+        .settings-toggle-button i {
+            transition: transform 0.3s;
+        }
+        
+        .settings-toggle-button:hover i {
+            transform: rotate(45deg);
+        }
+    </style>
+</head>
+<body>
+    <!-- 添加动态背景Canvas -->
+    <canvas id="c"></canvas>
+    <canvas id="pinkboard"></canvas>
+    
+    <!-- 测试按钮 - 用于触发预警测试 -->
+    <div class="test-alert-btn" id="test-alert-btn" onclick="testAlert()">
+        <i class="fas fa-bell"></i>
+        <span>测试预警</span>
+    </div>
+    
+    <!-- 装饰元素 -->
+    <div class="grid-overlay"></div>
+    <div class="corner-decor tl"></div>
+    <div class="corner-decor tr"></div>
+    <div class="corner-decor bl"></div>
+    <div class="corner-decor br"></div>
+    
+    <!-- 预警弹窗 -->
+    <div id="alert-popup" class="alert-popup hidden">
+        <div class="alert-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h2>交货预警通知</h2>
+        <div class="alert-content" id="alert-content">
+            <!-- 预警内容将通过JS填充 -->
+        </div>
+        <p>语音播报后将自动关闭</p>
+    </div>
+    
+    <!-- 预警时间设置面板 -->
+    <div id="settings-panel" class="settings-panel hidden">
+        <h3><i class="fas fa-cog"></i> 预警时间设置</h3>
+        <div class="time-control">
+            <label for="afternoon-time">提前一日预警时间 (前一天):</label>
+            <input type="time" id="afternoon-time" value="13:59">
+        </div>
+        <div class="time-control">
+            <label for="morning-time">当日预警时间 (当天):</label>
+            <input type="time" id="morning-time" value="00:00">
+        </div>
+        <button class="settings-btn" onclick="saveSettings()">保存设置</button>
+    </div>
+    
+    <!-- 新设置按钮 -->
+    <button class="settings-toggle-button" onclick="toggleSettings()">
+        <i class="fas fa-cog"></i>
+    </button>
+    
+    <!-- 顶部区域 -->
+    <header class="header">
+        <div class="logo-container">
+            <div class="logo">
+                <i class="fas fa-ship"></i>
+            </div>
+            <div class="title-container">
+                <h1>船用电器出货进度监控大屏</h1>
+                <div class="subtitle">
+                    <span id="plan-period"><i class="fas fa-database"></i> 计划安排周期: 2025年6月-2025年10月</span>
+                    <span id="department"><i class="fas fa-building"></i> 部门: 研发部</span>
+                    <span id="project"><i class="fas fa-project-diagram"></i> AMS项目</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-container">
+            <div class="time-weather">
+                <div class="real-time">
+                    <i class="fas fa-clock"></i>
+                    <span id="current-time">2025-06-19 14:30:45</span>
+                </div>
+                <div class="weather" id="weather-display">
+                    <i class="fas fa-sun"></i>
+                    <span>舟山 晴 26℃</span>
+                </div>
+            </div>
+            <div class="project-info">
+                <span id="progress-period"><i class="fas fa-calendar-alt"></i> 进度周期: 2025-06-17-2025-06-27</span>  
+                <span id="last-period"><i class="fas fa-calendar-day"></i> 上次进度周期: 2025-06-03 -2025-06-16</span>
+            </div>
+        </div>
+    </header>
+    
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <div class="table-container">
+            <div class="table-header">
+                <div class="header-cell">编号</div>
+                <div class="header-cell">订货单位</div>
+                <div class="header-cell">项目名称</div>
+                <div class="header-cell">入级</div>
+                <div class="header-cell">交货日期</div>
+                <div class="header-cell">项目负责人</div>
+                <div class="header-cell">车间进度</div>
+                <div class="header-cell">图纸进度</div>
+                <div class="header-cell">软件进度</div>
+                <div class="header-cell">模拟图进度</div>
+                <div class="header-cell">列表清单进度</div>
+            </div>
+            
+            <div class="table-body">
+                <div class="table-rows" id="projects-container">
+                    <!-- 项目数据将通过JS填充 -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 底部区域 -->
+    <footer class="footer">
+        <div class="days-counter">
+            <i class="fas fa-calendar-check"></i>
+            <span>距离上次进度周期结束已进行天数: <span class="number" id="days-counter">2</span> 天</span>
+        </div>
+        
+        <div class="system-status">
+            <div class="status-item">
+                <div class="status-indicator active" id="data-status"></div>
+                <span>数据连接状态</span>
+            </div>
+            <div class="status-item">
+                <div class="status-indicator active" id="system-status"></div>
+                <span>系统运行状态</span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-sync-alt"></i>
+                <span>最后更新: <span id="last-update">14:30:45</span></span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-bell"></i>
+                <span>预警状态: <span id="alert-status">监控中</span></span>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- 高大上的滚屏 - 已添加透明度 -->
+    <div id="alert-ticker" class="alert-ticker hidden">
+        <div class="ticker-container">
+            <div class="ticker-title">交货预警</div>
+            <div class="ticker-content" id="ticker-content">
+                <!-- 预警内容将通过JS动态填充 -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 存储当前项目数据 
+        let currentProjectData = []; 
+        let isAlertPlaying = false; 
+        
+        // 更新页面周期信息 
+        function updatePeriodsDisplay(periods) {
+            // 计划安排周期
+            const planPeriod = periods.plan_period || "2025年6月-2025年10月";
+            document.getElementById('plan-period').innerHTML = 
+                `<i class="fas fa-database"></i> 计划安排周期: ${planPeriod}`;
+            
+            // 部门
+            const department = periods.department || "研发部";
+            document.getElementById('department').innerHTML = 
+                `<i class="fas fa-building"></i> 部门: ${department}`;
+            
+            // 项目
+            const project = periods.project || "AMS";
+            document.getElementById('project').innerHTML = 
+                `<i class="fas fa-project-diagram"></i> ${project}项目`;
+            
+            // 进度周期
+            const progressPeriod = periods.progress_period || "2025-06-17 - 2025-06-27";
+            document.getElementById('progress-period').innerHTML = 
+                `<i class="fas fa-calendar-alt"></i> 进度周期: ${progressPeriod}`;
+            
+            // 上次进度周期
+            const lastPeriod = periods.last_period || "2025-06-03 - 2025-06-16";
+            document.getElementById('last-period').innerHTML = 
+                `<i class="fas fa-calendar-day"></i> 上次进度周期: ${lastPeriod}`;
+        }
+        
+        // 从API获取数据
+        async function fetchProjectData() {
+            try {
+                const response = await fetch('/api/data?t=' + Date.now());
+                
+                if (!response.ok) {
+                    console.error('API请求失败:', response.status);
+                    return [];
+                }
+                
+                const result = await response.json();
+                console.log('API响应数据:', result);
+                
+                if (result.status === 'success') {
+                    document.getElementById('data-status').classList.remove('inactive');
+                    document.getElementById('data-status').classList.add('active');
+                    
+                    // 更新周期信息
+                    if (result.periods) {
+                        updatePeriodsDisplay(result.periods);
+                    }
+                    
+                    return result.data || [];
+                }
+                return [];
+            } catch (error) {
+                console.error('获取项目数据失败:', error);
+                document.getElementById('data-status').classList.remove('active');
+                document.getElementById('data-status').classList.add('inactive');
+                return [];
+            }
+        }
+        
+        // 解析交货日期函数（前端版）
+        function parseDeliveryDate(dateStr) {
+            if (!dateStr) return null;
+            
+            // 尝试匹配多种日期格式
+            const match = dateStr.match(/(\d{4})[\.\-\/](\d{1,2})[\.\-\/](\d{1,2})/);
+            if (match) {
+                const year = parseInt(match[1]);
+                const month = parseInt(match[2]) - 1; // 月份从0开始
+                const day = parseInt(match[3]);
+                return new Date(year, month, day);
+            }
+            return null;
+        }
+        
+        // 生成表格行
+        function generateTableRows(projectData) {
+            const container = document.getElementById('projects-container');
+            container.innerHTML = '';
+            
+            if (!projectData || projectData.length === 0) {
+                container.innerHTML = `
+                    <div class="table-row">
+                        <div class="row-cell" style="grid-column:1/-1;text-align:center;padding:20px">
+                            没有找到项目数据
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 获取当前系统时间（不再转换时区）
+            const now = new Date();
+            
+            for (let i = 0; i < projectData.length; i++) {
+                const item = projectData[i];
+                const row = document.createElement('div');
+                row.className = 'table-row';
+                
+                try {
+                    // 蓝色呼吸效果：交货日期在未来的7天内（从今天开始，到第7天结束）
+                    const deliveryDate = parseDeliveryDate(item.delivery_date);
+                    if (deliveryDate) {
+                        // 获取今天的0点
+                        const today = new Date(now);
+                        today.setHours(0,0,0,0);
+                        // 计算7天后的0点（即第7天结束）
+                        const sevenDaysLater = new Date(today);
+                        sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
+
+                        // 检查交货日期是否在 [today, sevenDaysLater) 区间内
+                        if (deliveryDate >= today && deliveryDate < sevenDaysLater) {
+                            row.classList.add('highlight');
+                        }
+                    }
+                } catch (e) {
+                    console.error('日期解析错误', e);
+                }
+                
+                // 根据状态添加类名
+                let statusClass = '';
+                const workshop = item.workshop_progress || '';
+                if (workshop.includes('待发货')) statusClass = 'status-ready';
+                else if (workshop.includes('待生产')) statusClass = 'status-waiting';
+                else if (workshop.includes('已发货')) statusClass = 'status-shipped';
+                else if (workshop.includes('调试中')) statusClass = 'status-debug';
+                else statusClass = 'status-production';
+                
+                // 确保进度值是数字
+                const drawing = typeof item.drawing === 'number' ? item.drawing : 0;
+                const software = typeof item.software === 'number' ? item.software : 0;
+                const simulation = typeof item.simulation === 'number' ? item.simulation : 0;
+                const listing = typeof item.listing === 'number' ? item.listing : 0;
+                
+                row.innerHTML = `
+                    <div class="row-cell">${item.id || i + 1}</div>
+                    <div class="row-cell long-text">${item.client || '未知单位'}</div>
+                    <div class="row-cell long-text">${item.project_name || '未命名项目'}</div>
+                    <div class="row-cell">${item.classification || '无'}</div>
+                    <div class="row-cell">
+                        ${item.delivery_date || '未指定'}
+                        ${item.delivery_mark ? 
+                            `<span class="delivery-mark ${item.delivery_mark}">
+                                <i class="fas fa-${item.delivery_mark === 'FAT' ? 'clipboard-check' : 'ship'}"></i>
+                                ${item.delivery_mark}
+                            </span>` : ''
+                        }
+                    </div>
+                    <div class="row-cell long-text">${item.responsible || '未指定'}</div>
+                    <div class="row-cell"><span class="status-tag ${statusClass}">${workshop}</span></div>
+                    <div class="row-cell progress-cell">
+                        ${drawing}%
+                        <div class="progress-bar" style="width:${drawing}%"></div>
+                    </div>
+                    <div class="row-cell progress-cell">
+                        ${software}%
+                        <div class="progress-bar" style="width:${software}%"></div>
+                    </div>
+                    <div class="row-cell progress-cell">
+                        ${simulation}%
+                        <div class="progress-bar" style="width:${simulation}%"></div>
+                    </div>
+                    <div class="row-cell progress-cell">
+                        ${listing}%
+                        <div class="progress-bar" style="width:${listing}%"></div>
+                    </div>
+                `;
+                
+                container.appendChild(row);
+            }
+            
+            // 复制一份以实现无缝滚动
+            const clone = container.cloneNode(true);
+            container.parentNode.appendChild(clone);
+        }
+        
+        // 更新天气函数
+        function updateWeather() {
+            const weatherConditions = [
+                { icon: 'fa-sun', text: '晴', temp: 26 },
+                { icon: 'fa-cloud-sun', text: '多云', temp: 24 },
+                { icon: 'fa-cloud', text: '阴', temp: 23 },
+                { icon: 'fa-cloud-rain', text: '小雨', temp: 22 }
+            ];
+            
+            const randomWeather = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
+            
+            document.getElementById('weather-display').innerHTML = `
+                <i class="fas ${randomWeather.icon}"></i>
+                <span>舟山 ${randomWeather.text} ${randomWeather.temp}℃</span>
+            `;
+        }
+        
+        // 更新时间函数（使用本地时间）
+        function updateTime() {
+            const now = new Date();
+            
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            const dateStr = `${year}-${month}-${day}`;
+            const timeStr = `${hours}:${minutes}:${seconds}`;
+            
+            document.getElementById('current-time').textContent = `${dateStr} ${timeStr}`;
+            document.getElementById('last-update').textContent = timeStr;
+            
+            // 更新天数计数器
+            try {
+                // 尝试从页面元素中获取上次进度周期结束日期
+                const lastPeriodText = document.getElementById('last-period').textContent;
+                // 提取结束日期部分
+                const dateRange = lastPeriodText.split('-');
+                if (dateRange.length >= 2) {
+                    const lastEndDateStr = dateRange[1].trim().split(' ')[0];
+                    const lastCycleEnd = new Date(lastEndDateStr);
+                    
+                    // 计算天数差
+                    const timeDiff = now - lastCycleEnd;
+                    const diffDays = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+                    document.getElementById('days-counter').textContent = diffDays;
+                    return;
+                }
+            } catch (e) {
+                console.warn("天数计数器错误:", e);
+            }
+            
+            // 默认计算
+            try {
+                const lastCycleEnd = new Date('2025-06-16');
+                const timeDiff = now - lastCycleEnd;
+                const diffDays = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+                document.getElementById('days-counter').textContent = diffDays;
+            } catch (e) {
+                console.error("默认天数计算错误:", e);
+            }
+        }
+        
+        // 显示预警弹窗
+        function showAlert(alerts) {
+            console.log("显示预警弹窗:", alerts);
+            
+            const alertPopup = document.getElementById('alert-popup');
+            const alertContent = document.getElementById('alert-content');
+            
+            // 更新预警内容
+            alertContent.innerHTML = '';
+            
+            alerts.forEach(alert => {
+                // 中央弹窗内容
+                const alertItem = document.createElement('div');
+                alertItem.className = 'alert-item';
+                alertItem.innerHTML = `
+                    <div class="alert-project">${alert.project_name}</div>
+                    <div class="alert-date">预警日期: ${alert.alert_date}</div>
+                    <div class="alert-message">预警内容: ${alert.alert_content}</div>
+                `;
+                alertContent.appendChild(alertItem);
+            });
+            
+            // 显示中央弹窗
+            alertPopup.classList.remove('hidden');
+            
+            // 播放语音
+            playAlertVoice(alerts);
+            
+            // 更新预警状态
+            document.getElementById('alert-status').textContent = '预警中';
+            document.getElementById('alert-status').style.color = '#ff5252';
+        }
+        
+        // 播放语音 - 确保界面显示和语音兼容
+        function playAlertVoice(alerts) {
+            console.log("开始播放预警语音");
+            
+            // 确保先显示弹窗
+            document.getElementById('alert-popup').classList.remove('hidden');
+            
+            // 检查浏览器是否支持语音API
+            if (!('speechSynthesis' in window)) {
+                console.warn("浏览器不支持语音合成");
+                // 3秒后自动隐藏弹窗
+                setTimeout(() => {
+                    document.getElementById('alert-popup').classList.add('hidden');
+                    isAlertPlaying = false;
+                }, 3000);
+                return;
+            }
+            
+            isAlertPlaying = true;
+            
+            let alertMessage = "";
+            alerts.forEach(alert => {
+                // 只拼接项目名称、预警日期和预警内容
+                if (alert.project_name && alert.alert_date && alert.alert_content) {
+                    // 跳过空白内容
+                    if (alert.alert_content.trim() === "" || alert.alert_content === "待定") {
+                        return;
+                    }
+                    alertMessage += `${alert.project_name}，${alert.alert_date}，${alert.alert_content}。`;
+                }
+            });
+            
+            // 确保有实际内容才播放
+            if (!alertMessage) {
+                console.log("跳过语音播报：预警内容为空或无效");
+                // 3秒后自动隐藏弹窗
+                setTimeout(() => {
+                    document.getElementById('alert-popup').classList.add('hidden');
+                    isAlertPlaying = false;
+                }, 3000);
+                return;
+            }
+
+            const speech = new SpeechSynthesisUtterance(alertMessage);
+            speech.lang = 'zh-CN';
+            speech.rate = 1.0;
+            speech.pitch = 1.0;
+            
+            // 播放两次
+            let count = 0;
+            const play = () => {
+                if (count < 2) {
+                    // 确保每次播放前弹窗可见
+                    document.getElementById('alert-popup').classList.remove('hidden');
+                    console.log(`播放第${count+1}次语音`);
+                    window.speechSynthesis.speak(speech);
+                    count++;
+                    // 两次播放之间间隔3秒
+                    setTimeout(play, 3000);
+                } else {
+                    console.log("语音播放结束，隐藏弹窗");
+                    // 两次播放结束后隐藏弹窗
+                    setTimeout(() => {
+                        document.getElementById('alert-popup').classList.add('hidden');
+                        isAlertPlaying = false;
+                    }, 1000);
+                }
+            };
+            play();
+        }
+        
+        // 测试预警功能
+        function testAlert() {
+            console.log("触发测试预警");
+            showAlert([{
+                project_name: "测试项目",
+                alert_date: new Date().toISOString().split('T')[0],
+                alert_content: "这是一个测试预警，用于验证系统功能是否正常"
+            }]);
+        }
+        
+        // 保存预警时间设置
+        function saveSettings() {
+            const afternoonTime = document.getElementById('afternoon-time').value;
+            const morningTime = document.getElementById('morning-time').value;
+            
+            // 保存到localStorage
+            localStorage.setItem('alertSettings', JSON.stringify({
+                afternoonTime: afternoonTime,
+                morningTime: morningTime
+            }));
+            
+            // 发送到后端保存
+            fetch('/api/save_settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    afternoon_alert_time: afternoonTime,
+                    morning_alert_time: morningTime
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    showAlert([{
+                        project_name: "系统设置",
+                        alert_date: new Date().toISOString().split('T')[0],
+                        alert_content: "预警时间设置已保存"
+                    }]);
+                } else {
+                    console.error('保存设置失败:', data.message);
+                    showAlert([{
+                        project_name: "系统设置",
+                        alert_date: new Date().toISOString().split('T')[0],
+                        alert_content: "保存设置失败: " + (data.message || "未知错误")
+                    }]);
+                }
+            })
+            .catch(error => {
+                console.error('保存设置失败', error);
+                showAlert([{
+                    project_name: "系统设置",
+                    alert_date: new Date().toISOString().split('T')[0],
+                    alert_content: "保存设置失败，请检查网络连接"
+                }]);
+            });
+            
+            // 隐藏设置面板
+            document.getElementById('settings-panel').classList.add('hidden');
+        }
+        
+        // 切换设置面板显示
+        function toggleSettings() {
+            const panel = document.getElementById('settings-panel');
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+        
+        // 更新滚屏内容
+        function updateTicker(alerts) {
+            console.log('[updateTicker] alerts:', alerts);
+            const ticker = document.getElementById('alert-ticker');
+            const tickerContent = document.getElementById('ticker-content');
+            // 过滤掉系统预警（测试预警和设置保存成功的预警）
+            const filteredAlerts = alerts.filter(alert => 
+                alert.project_name !== "系统设置" && alert.project_name !== "测试项目"
+            );
+            if (filteredAlerts.length === 0) {
+                ticker.classList.add('hidden');
+                tickerContent.innerHTML = '<span style="color:#fff">当前无预警</span>';
+                console.log('[updateTicker] 没有可显示的预警');
+                return;
+            }
+            ticker.classList.remove('hidden');
+            tickerContent.innerHTML = '';
+            filteredAlerts.forEach(alert => {
+                const item = document.createElement('div');
+                item.className = 'ticker-item';
+                item.innerHTML = `
+                    <span class="ticker-project">${alert.project_name}</span>
+                    <span class="ticker-date">预警日期: ${alert.alert_date}</span>
+                    <span class="ticker-message">${alert.alert_content}</span>
+                `;
+                tickerContent.appendChild(item);
+            });
+        }
+        
+        // 检查是否需要预警
+        function checkForAlerts({showPopup = false} = {}) {
+            fetch('/api/data?t=' + Date.now())
+            .then(response => response.json())
+            .then(result => {
+                console.log('[checkForAlerts] active_alerts:', result.active_alerts);
+                if (result.status === 'success') {
+                    const activeAlerts = result.active_alerts || [];
+                    if (showPopup && activeAlerts.length > 0 && !isAlertPlaying) {
+                        showAlert(activeAlerts);
+                    } else if (activeAlerts.length === 0) {
+                        document.getElementById('alert-popup').classList.add('hidden');
+                        document.getElementById('alert-status').textContent = '监控中';
+                        document.getElementById('alert-status').style.color = '#89cff0';
+                    }
+                    updateTicker(activeAlerts);
+                } else {
+                    console.log('[checkForAlerts] result.status!=success', result);
+                }
+            })
+            .catch(error => {
+                console.error('获取预警数据失败', error);
+            });
+        }
+        
+        // 只在设置的两个时间点自动弹窗和语音
+        function scheduleAlertAt(timeStr, callback) {
+            function getNextTriggerTime(timeStr) {
+                const now = new Date();
+                const [h, m] = timeStr.split(":").map(Number);
+                let next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+                if (now >= next) {
+                    // 已过今天，设为明天
+                    next.setDate(next.getDate() + 1);
+                }
+                return next;
+            }
+            function schedule() {
+                const next = getNextTriggerTime(timeStr);
+                const delay = next - new Date();
+                setTimeout(() => {
+                    callback();
+                    schedule(); // 递归下一次
+                }, delay);
+            }
+            schedule();
+        }
+        
+        // 定时点强制弹窗+语音
+        let lastAlertMinute = '';
+        setInterval(async function() {
+            const res = await fetch('/api/data?t=' + Date.now());
+            if (!res.ok) return;
+            const data = await res.json();
+            if (!data || !data.alert_settings) return;
+            const now = new Date();
+            const hour = now.getHours();
+            const minute = now.getMinutes();
+            const mArr = data.alert_settings.morning_alert_time.split(':').map(Number);
+            const aArr = data.alert_settings.afternoon_alert_time.split(':').map(Number);
+            const nowKey = `${hour}:${minute}`;
+            // 只要到点且有active_alerts就强制弹窗+语音
+            if ((hour === mArr[0] && minute === mArr[1]) || (hour === aArr[0] && minute === aArr[1])) {
+                if (data.active_alerts && data.active_alerts.length > 0 && lastAlertMinute !== nowKey) {
+                    showAlert(data.active_alerts);
+                    lastAlertMinute = nowKey;
+                }
+            }
+        }, 60000);
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', () => {
+            // 变量声明提前，彻底修复作用域问题
+            let afternoonTime = "13:59";
+            let morningTime = "00:00";
+            // 尝试从localStorage加载设置
+            const savedSettings = localStorage.getItem('alertSettings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                afternoonTime = settings.afternoonTime || "13:59";
+                morningTime = settings.morningTime || "00:00";
+                document.getElementById('afternoon-time').value = afternoonTime;
+                document.getElementById('morning-time').value = morningTime;
+            }
+            
+            // 初始更新时间
+            updateTime();
+            setInterval(updateTime, 1000);
+            
+            // 初始更新天气
+            updateWeather();
+            setInterval(updateWeather, 30 * 60 * 1000);
+            
+            // 初始加载数据
+            fetchProjectData().then(projectData => {
+                window.currentProjectData = projectData;
+                generateTableRows(projectData);
+            });
+            
+            // 每30秒刷新数据
+            setInterval(() => {
+                fetchProjectData().then(projectData => {
+                    window.currentProjectData = projectData;
+                    generateTableRows(projectData);
+                });
+            }, 30 * 1000);
+            
+            // 只在"前一天时间"自动弹窗
+            scheduleAlertAt(afternoonTime, () => {
+                checkForAlerts({showPopup: true});
+            });
+            // 只在"当天时间"自动弹窗
+            scheduleAlertAt(morningTime, () => {
+                checkForAlerts({showPopup: true});
+            });
+            // 页面加载时立即刷新滚屏，保证有预警马上显示
+            checkForAlerts({showPopup: false});
+        });
+    </script>
+    
+    <!-- 添加动态背景效果 -->
+    <script>
+        // 代码雨效果
+        var c=document.getElementById("c");
+        var ctx=c.getContext("2d");
+        c.width=window.innerWidth;
+        c.height=window.innerHeight;
+        
+        var string1 = "abcdefghijklmnopqrstuvwxyz";
+        string1.split("");
+        var fontsize=20;
+        columns=c.width/fontsize;
+        var drop = [];
+        for(var x=0;x<columns;x++) {
+            drop[x]=0;
+        }
+        
+        function drap(){
+            ctx.fillStyle="rgba(0,0,0,0.07)";
+            ctx.fillRect(0,0,c.width,c.height);
+            ctx.fillStyle="#87cefa";
+            ctx.font=fontsize+"px arial";
+            for(var i=0;i<drop.length;i++){
+                var text1=string1[Math.floor(Math.random()*string1.length)];
+                ctx.fillText(text1,i*fontsize,drop[i]*fontsize);
+                drop[i]++;
+                if(drop[i]*fontsize>c.height&&Math.random()>0.9){
+                    drop[i]=0;
+                }
+            }
+        }
+        setInterval(drap,50);
+        
+        // 爱心粒子效果
+        var settings = {
+            particles: {
+                length: 500, // maximum amount of particles
+                duration: 2, // particle duration in sec
+                velocity: 100, // particle velocity in pixels/sec
+                effect: -0.75, // play with this for a nice effect
+                size: 30, // particle size in pixels
+            },
+        };
+        
+        (function(){var b=0;var c=["ms","moz","webkit","o"];for(var a=0;a<c.length&&!window.requestAnimationFrame;++a){window.requestAnimationFrame=window[c[a]+"RequestAnimationFrame"];window.cancelAnimationFrame=window[c[a]+"CancelAnimationFrame"]||window[c[a]+"CancelRequestAnimationFrame"]}if(!window.requestAnimationFrame){window.requestAnimationFrame=function(h,e){var d=new Date().getTime();var f=Math.max(0,16-(d-b));var g=window.setTimeout(function(){h(d+f)},f);b=d+f;return g}}if(!window.cancelAnimationFrame){window.cancelAnimationFrame=function(d){clearTimeout(d)}}}());
+        
+        var Point = (function() {
+            function Point(x, y) {
+                this.x = (typeof x !== 'undefined') ? x : 0;
+                this.y = (typeof y !== 'undefined') ? y : 0;
+            }
+            Point.prototype.clone = function() {
+                return new Point(this.x, this.y);
+            };
+            Point.prototype.length = function(length) {
+                if (typeof length == 'undefined')
+                    return Math.sqrt(this.x * this.x + this.y * this.y);
+                this.normalize();
+                this.x *= length;
+                this.y *= length;
+                return this;
+            };
+            Point.prototype.normalize = function() {
+                var length = this.length();
+                this.x /= length;
+                this.y /= length;
+                return this;
+            };
+            return Point;
+        })();
+        
+        var Particle = (function() {
+            function Particle() {
+                this.position = new Point();
+                this.velocity = new Point();
+                this.acceleration = new Point();
+                this.age = 0;
+            }
+            Particle.prototype.initialize = function(x, y, dx, dy) {
+                this.position.x = x;
+                this.position.y = y;
+                this.velocity.x = dx;
+                this.velocity.y = dy;
+                this.acceleration.x = dx * settings.particles.effect;
+                this.acceleration.y = dy * settings.particles.effect;
+                this.age = 0;
+            };
+            Particle.prototype.update = function(deltaTime) {
+                this.position.x += this.velocity.x * deltaTime;
+                this.position.y += this.velocity.y * deltaTime;
+                this.velocity.x += this.acceleration.x * deltaTime;
+                this.velocity.y += this.acceleration.y * deltaTime;
+                this.age += deltaTime;
+            };
+            Particle.prototype.draw = function(context, image) {
+                function ease(t) {
+                    return (--t) * t * t + 1;
+                }
+                var size = image.width * ease(this.age / settings.particles.duration);
+                context.globalAlpha = 1 - this.age / settings.particles.duration;
+                context.drawImage(image, this.position.x - size / 2, this.position.y - size / 2, size, size);
+            };
+            return Particle;
+        })();
+        
+        var ParticlePool = (function() {
+            var particles,
+                firstActive = 0,
+                firstFree   = 0,
+                duration    = settings.particles.duration;
+            
+            function ParticlePool(length) {
+                particles = new Array(length);
+                for (var i = 0; i < particles.length; i++)
+                    particles[i] = new Particle();
+            }
+            ParticlePool.prototype.add = function(x, y, dx, dy) {
+                particles[firstFree].initialize(x, y, dx, dy);
+                
+                firstFree++;
+                if (firstFree   == particles.length) firstFree   = 0;
+                if (firstActive == firstFree       ) firstActive++;
+                if (firstActive == particles.length) firstActive = 0;
+            };
+            ParticlePool.prototype.update = function(deltaTime) {
+                var i;
+                
+                if (firstActive < firstFree) {
+                    for (i = firstActive; i < firstFree; i++)
+                        particles[i].update(deltaTime);
+                }
+                if (firstFree < firstActive) {
+                    for (i = firstActive; i < particles.length; i++)
+                        particles[i].update(deltaTime);
+                    for (i = 0; i < firstFree; i++)
+                        particles[i].update(deltaTime);
+                }
+                
+                while (particles[firstActive].age >= duration && firstActive != firstFree) {
+                    firstActive++;
+                    if (firstActive == particles.length) firstActive = 0;
+                }
+            };
+            ParticlePool.prototype.draw = function(context, image) {
+                if (firstActive < firstFree) {
+                    for (i = firstActive; i < firstFree; i++)
+                        particles[i].draw(context, image);
+                }
+                if (firstFree < firstActive) {
+                    for (i = firstActive; i < particles.length; i++)
+                        particles[i].draw(context, image);
+                    for (i = 0; i < firstFree; i++)
+                        particles[i].draw(context, image);
+                }
+            };
+            return ParticlePool;
+        })();
+        
+        (function(canvas) {
+            var context = canvas.getContext('2d'),
+                particles = new ParticlePool(settings.particles.length),
+                particleRate = settings.particles.length / settings.particles.duration,
+                time;
+            
+            function pointOnHeart(t) {
+                return new Point(
+                    160 * Math.pow(Math.sin(t), 3),
+                    130 * Math.cos(t) - 50 * Math.cos(2 * t) - 20 * Math.cos(3 * t) - 10 * Math.cos(4 * t) + 25
+                );
+            }
+            
+            var image = (function() {
+                var canvas  = document.createElement('canvas'),
+                    context = canvas.getContext('2d');
+                canvas.width  = settings.particles.size;
+                canvas.height = settings.particles.size;
+                function to(t) {
+                    var point = pointOnHeart(t);
+                    point.x = settings.particles.size / 2 + point.x * settings.particles.size / 350;
+                    point.y = settings.particles.size / 2 - point.y * settings.particles.size / 350;
+                    return point;
+                }
+                context.beginPath();
+                var t = -Math.PI;
+                var point = to(t);
+                context.moveTo(point.x, point.y);
+                while (t < Math.PI) {
+                    t += 0.01;
+                    point = to(t);
+                    context.lineTo(point.x, point.y);
+                }
+                context.closePath();
+                context.fillStyle = '#87ce';
+                context.fill();
+                var image = new Image();
+                image.src = canvas.toDataURL();
+                return image;
+            })();
+            
+            function render() {
+                requestAnimationFrame(render);
+                
+                var newTime   = new Date().getTime() / 1000,
+                    deltaTime = newTime - (time || newTime);
+                time = newTime;
+                
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                
+                var amount = particleRate * deltaTime;
+                for (var i = 0; i < amount; i++) {
+                    var pos = pointOnHeart(Math.PI - 2 * Math.PI * Math.random());
+                    var dir = pos.clone().length(settings.particles.velocity);
+                    particles.add(canvas.width / 2 + pos.x, canvas.height / 2 - pos.y, dir.x, -dir.y);
+                }
+                
+                particles.update(deltaTime);
+                particles.draw(context, image);
+            }
+            
+            function onResize() {
+                canvas.width  = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+            }
+            window.onresize = onResize;
+            
+            setTimeout(function() {
+                onResize();
+                render();
+            }, 10);
+        })(document.getElementById('pinkboard'));
+    </script>
+</body>
+</html>
